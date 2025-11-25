@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Todo App</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .add-todo {
+            padding: 30px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        #todoInput {
+            flex: 1;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        #todoInput:focus {
+            border-color: #667eea;
+        }
+
+        #addBtn {
+            padding: 15px 25px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: transform 0.2s;
+        }
+
+        #addBtn:hover {
+            transform: translateY(-2px);
+        }
+
+        .todo-list {
+            padding: 20px 30px 30px;
+        }
+
+        .todo-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 15px;
+            margin-bottom: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            transition: all 0.3s;
+        }
+
+        .todo-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .todo-text {
+            flex: 1;
+            font-size: 16px;
+            color: #333;
+        }
+
+        .delete-btn {
+            background: #ff4757;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+
+        .delete-btn:hover {
+            background: #ff3742;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .empty-state img {
+            width: 100px;
+            opacity: 0.5;
+            margin-bottom: 20px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .todo-item {
+            animation: fadeIn 0.3s ease-out;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>✨ Todo App</h1>
+            <p>Stay organized and productive</p>
+        </div>
+        
+        <div class="add-todo">
+            <div class="input-group">
+                <input type="text" id="todoInput" placeholder="What needs to be done?" maxlength="100">
+                <button id="addBtn">Add Todo</button>
+            </div>
+        </div>
+        
+        <div class="todo-list">
+            <div id="loading" class="loading" style="display: none;">Loading todos...</div>
+            <div id="todoContainer"></div>
+            <div id="emptyState" class="empty-state" style="display: none;">
+                <div style="font-size: 4rem;">📝</div>
+                <h3>No todos yet!</h3>
+                <p>Add your first todo above to get started.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api/todos';
+        const todoInput = document.getElementById('todoInput');
+        const addBtn = document.getElementById('addBtn');
+        const todoContainer = document.getElementById('todoContainer');
+        const emptyState = document.getElementById('emptyState');
+        const loading = document.getElementById('loading');
+
+        // Load todos on page load
+        document.addEventListener('DOMContentLoaded', loadTodos);
+
+        // Add todo on button click or Enter key
+        addBtn.addEventListener('click', addTodo);
+        todoInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') addTodo();
+        });
+
+        async function loadTodos() {
+            showLoading(true);
+            try {
+                const response = await fetch(API_BASE);
+                const todos = await response.json();
+                displayTodos(todos);
+            } catch (error) {
+                console.error('Error loading todos:', error);
+                showError('Failed to load todos');
+            }
+            showLoading(false);
+        }
+
+        async function addTodo() {
+            const title = todoInput.value.trim();
+            if (!title) return;
+
+            try {
+                const response = await fetch(API_BASE, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title })
+                });
+                
+                if (response.ok) {
+                    todoInput.value = '';
+                    loadTodos();
+                } else {
+                    showError('Failed to add todo');
+                }
+            } catch (error) {
+                console.error('Error adding todo:', error);
+                showError('Failed to add todo');
+            }
+        }
+
+        async function deleteTodo(id) {
+            try {
+                const response = await fetch(`${API_BASE}/${id}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    loadTodos();
+                } else {
+                    showError('Failed to delete todo');
+                }
+            } catch (error) {
+                console.error('Error deleting todo:', error);
+                showError('Failed to delete todo');
+            }
+        }
+
+        function displayTodos(todos) {
+            todoContainer.innerHTML = '';
+            
+            if (todos.length === 0) {
+                emptyState.style.display = 'block';
+                return;
+            }
+            
+            emptyState.style.display = 'none';
+            
+            todos.forEach(todo => {
+                const todoElement = document.createElement('div');
+                todoElement.className = 'todo-item';
+                todoElement.innerHTML = `
+                    <span class="todo-text">${escapeHtml(todo.title)}</span>
+                    <button class="delete-btn" onclick="deleteTodo(${todo.id})">Delete</button>
+                `;
+                todoContainer.appendChild(todoElement);
+            });
+        }
+
+        function showLoading(show) {
+            loading.style.display = show ? 'block' : 'none';
+        }
+
+        function showError(message) {
+            alert(message); // Simple error handling
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
