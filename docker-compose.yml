@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  # Development Environment
+  todo-app-dev:
+    build: ./todo-app
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+    env_file:
+      - ./config/dev.env
+    volumes:
+      - ./todo-app/src:/app/src
+    profiles:
+      - dev
+
+  # Test Environment  
+  todo-app-test:
+    build: ./todo-app
+    ports:
+      - "3001:3000"
+    environment:
+      - NODE_ENV=test
+    env_file:
+      - ./config/test.env
+    profiles:
+      - test
+
+  # Staging Environment
+  todo-app-staging:
+    build: ./todo-app
+    ports:
+      - "3002:3000"
+    environment:
+      - NODE_ENV=staging
+    env_file:
+      - ./config/staging.env
+    profiles:
+      - staging
+
+  # Production Environment
+  todo-app-prod:
+    build: ./todo-app
+    ports:
+      - "3003:3000"
+    environment:
+      - NODE_ENV=production
+    env_file:
+      - ./config/prod.env
+    restart: unless-stopped
+    profiles:
+      - prod
+
+# Usage:
+# docker-compose --profile dev up    # Development
+# docker-compose --profile test up   # Test
+# docker-compose --profile staging up # Staging  
+# docker-compose --profile prod up   # Production
