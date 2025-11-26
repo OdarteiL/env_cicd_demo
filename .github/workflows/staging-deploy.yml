@@ -1,0 +1,109 @@
+name: Staging Environment Deploy
+
+on:
+  push:
+    branches: [ staging ]
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '18'
+  DOCKER_IMAGE: todo-app
+  ENVIRONMENT: staging
+
+jobs:
+  pre-deployment-tests:
+    runs-on: ubuntu-latest
+    environment: staging
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: todo-app/package-lock.json
+        
+    - name: Install dependencies
+      run: |
+        cd todo-app
+        npm ci
+        
+    - name: Run all tests
+      run: |
+        cd todo-app
+        npm run lint
+        npm test
+        echo "✅ All tests passed!"
+
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment: staging
+    needs: pre-deployment-tests
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Build Docker image
+      run: |
+        cd todo-app
+        docker build -t ${{ env.DOCKER_IMAGE }}:${{ env.ENVIRONMENT }} .
+        
+    - name: Deploy to staging
+      run: |
+        # Stop existing staging container if running
+        docker stop staging-todo-app 2>/dev/null || true
+        docker rm staging-todo-app 2>/dev/null || true
+        
+        # Run new staging container
+        docker run -d -p 3001:3000 --name staging-todo-app ${{ env.DOCKER_IMAGE }}:${{ env.ENVIRONMENT }}
+        sleep 10
+        
+    - name: Integration tests
+      run: |
+        # Test API endpoints
+        curl -f http://localhost:3001/api/todos || exit 1
+        
+        # Test adding a todo
+        RESPONSE=$(curl -s -X POST http://localhost:3001/api/todos \
+          -H "Content-Type: application/json" \
+          -d '{"title": "Integration Test Todo"}')
+        echo "Add todo response: $RESPONSE"
+        
+        # Test getting todos
+        TODOS=$(curl -s http://localhost:3001/api/todos)
+        echo "Get todos response: $TODOS"
+        
+        # Test UI is accessible
+        curl -f http://localhost:3001/ || exit 1
+        
+        echo "✅ Integration tests passed!"
+        
+    - name: Smoke tests
+      run: |
+        # Performance test
+        echo "Running smoke tests..."
+        
+        # Test response time
+        RESPONSE_TIME=$(curl -o /dev/null -s -w '%{time_total}' http://localhost:3001/)
+        echo "Response time: ${RESPONSE_TIME}s"
+        
+        # Test multiple requests
+        for i in {1..5}; do
+          curl -f http://localhost:3001/api/todos > /dev/null
+          echo "Request $i: OK"
+        done
+        
+        echo "✅ Smoke tests passed!"
+        
+    - name: Staging deployment summary
+      run: |
+        echo "🎭 STAGING DEPLOYMENT SUCCESSFUL"
+        echo "================================"
+        echo "Environment: ${{ env.ENVIRONMENT }}"
+        echo "URL: http://localhost:3001"
+        echo "Commit: ${{ github.sha }}"
+        echo "Deployed at: $(date)"
